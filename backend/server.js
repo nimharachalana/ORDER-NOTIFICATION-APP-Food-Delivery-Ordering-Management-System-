@@ -8,7 +8,7 @@ import 'dotenv/config'
 import cartRouter from "./routes/cartRoute.js"
 import orderRouter from "./routes/orderRoute.js"
 import http from "http"; // http package in node.js
-import {Server} from require("socket.io");
+import {Server} from  "socket.io";
 
 // app config
 const app = express()
