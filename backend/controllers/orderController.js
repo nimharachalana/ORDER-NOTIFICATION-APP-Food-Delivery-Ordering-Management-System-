@@ -62,7 +62,16 @@ const verifyOrder = async (req,res) => {
     const {orderId,success} = req.body;
     try {
         if (success=="true") {
-            await orderModel.findByIdAndUpdate(orderId,{payment:true});
+            const updatedOrder = await orderModel.findByIdAndUpdate(orderId,{payment:true}, {new: true});
+            res.json({success:true,message:"Paid"})
+
+            if (req.io) {
+                req.io.emit('new-order-notification', updatedOrder);
+                console.log(`Socket notification sent for order: ${orderId}`);
+            }
+            else{
+                console.error("Socket.io is not defined in req object!");
+            }
             res.json({success:true,message:"Paid"})
         }
         else{
