@@ -1,47 +1,106 @@
-import { StyleSheet, Text, View, Alert } from "react-native";
+import { StyleSheet, Text, View, Alert, FlatList, ActivityIndicator } from "react-native";
 import io from 'socket.io-client';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import axios from "axios";
+
 
 export default function HomeScreen(){
-  const [lastOrder, setLastOrder] = useState<any>(null);
-  
-  useEffect(() => {
-    const socket = io("http://192.168.8.139:4000"); // Replace with your server URL
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    socket.on("connect", () => {
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const BACKEND_URL = "http://192.168.8.139:4000";
+  
+  const fetchOrders = async () => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/order/list`);
+
+      if (response.data.success) {
+        setOrders(response.data.data.reverse());
+      }
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+
+    const socket = io(BACKEND_URL);
+
+    socket.on("connect",() => {
       console.log("✅ App connected to Socket Server!");
     });
 
-    socket.on("new-order-notification", (orderData) => {
-      console.log("🔔 New Order Received:", orderData);
-      setLastOrder(orderData);
+    socket.on("new-order-notification", (newOrder) => {
+      console.log("🔔 New Order :", newOrder);
+
+      setOrders((prevOrders) => [newOrder, ...prevOrders]);
+
       Alert.alert(
         "New Order Received! 🍕",
-        `Amount: Rs. ${orderData.amount}\nAddress: ${orderData.address?.street || 'No address'}}`
+        `Amount: Rs. ${newOrder.amount}\nTable/Address: ${newOrder.address?.street || 'N/A'}}`
       );
     });
 
     return () => {
       socket.disconnect();
     };
-
+ 
   }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchOrders();
+  }, [])
+  
+  const renderOrderItem = ({ item }: {item: any}) => (
+    <View style={styles.orderBox}>
+      <View style={styles.headerRow}>
+        <Text style={styles.orderId}>ID: ...{item._id.slice(-4)}</Text> 
+        <Text style={[styles.status, {color: item.status === 'Delivered' ? 'green' : 'orange'}]}>
+          {item.status}
+        </Text>
+      </View>
+
+      <Text style={styles.amount}>Rs. {item.amount}.00</Text>
+
+      <Text style={styles.details}>
+        📅 {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'} | 
+        🕒 {item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
+      </Text>
+
+      <Text style={styles.address}>📍 {item.address?.firstName} - {item.address?.street}</Text>
+      
+    </View>
+  )
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Cantec Admin App 👨‍🍳</Text>
-      <Text style={styles.subtitle}>Waiting for orders...</Text>
+      <Text style={styles.title}>Cantec Admin 👨‍🍳</Text>
+      <Text style={styles.subtitle}>Real-time Order Feed</Text>
 
-      {lastOrder ?(
-        <View style={styles.orderBox}>
-          <Text style={styles.orderTitle}>Last Order Details:</Text>
-          <Text>ID: {lastOrder._id}</Text>
-          <Text>Amount: {lastOrder.amount}</Text>
-          <Text>Status: {lastOrder.status}</Text>
-        </View>
-      ) : (
-        <Text style={{marginTop: 20, color: 'gray'}}>No new orders yet.</Text>  
-      )}
+      {loading ? (
+        <ActivityIndicator size="large" color="#1890ff" style={{marginTop:50}} />
+      ) :(
+        <FlatList
+          data = {orders}
+          keyExtractor={(item)=> item._id}
+          renderItem = {renderOrderItem}
+          contentContainerStyle = {styles.listContainer}
+
+          refreshing = {refreshing}
+          onRefresh = {onRefresh}
+
+          ListEmptyComponent = {
+            <Text style={styles.emptyText}>No order found yet.</Text>
+          }
+        />
+        )}
     </View>
   );
 }
@@ -49,34 +108,75 @@ export default function HomeScreen(){
 const styles = StyleSheet.create({
   container:{
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    backgroundColor: '#f5f5f5',
+    paddingTop:50,
+    paddingHorizontal: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 10,
+    textAlign: 'center',
     color: '#333',
   },
   subtitle:{
     fontSize: 16,
     color: '#666',
+    textAlign:'center',
+    marginBottom: 20,
   },
   orderBox: {
-    marginTop: 20,
+    backgroundColor: '#fff',
     padding: 15,
-    backgroundColor: '#e6f7ff',
-    borderRadius: 10,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#1890ff',
+    borderRadius: 12,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3, // Android shadow
   },
-  orderTitle:{
-    fontWeight: 'bold',
+  // orderTitle:{
+  //   fontWeight: 'bold',
+  //   marginBottom: 5,
+  //   fontSize: 18,
+  // },
+  listContainer:{
+    paddingBottom: 20,
+  },
+  emptyText:{
+    textAlign: 'center',
+    marginTop: 50,
+    color: '#999',
+    fontSize: 16,
+  },
+  headerRow:{
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 5,
-    fontSize: 18,
-  }
+  },
+  orderId:{
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  status:{
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  amount:{
+fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1890ff',
+    marginBottom: 5,
+  },
+  details:{
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 5,
+  },
+  address:{
+    fontSize: 14,
+    color: '#333',
+    marginTop: 5,
+  },
 });
 
