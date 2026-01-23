@@ -1,16 +1,55 @@
-import { StyleSheet, Text, View, Alert, FlatList, ActivityIndicator } from "react-native";
+import { StyleSheet, Text, View, Alert, FlatList, ActivityIndicator, Platform } from "react-native";
 import io from 'socket.io-client';
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import * as Notifications from 'expo-notifications';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function HomeScreen(){
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [refreshing, setRefreshing] = useState(false);
   
   const BACKEND_URL = "http://192.168.8.139:4000";
+
+  useEffect(() => {
+    async function requestPermissions() {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to show notifications was denied!');
+      }
+
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX, 
+          vibrationPattern: [0, 250, 250, 250], 
+          lightColor: '#FF231F7C',
+        });
+      }
+    }
+    requestPermissions();
+  }, []);
+
+  const sendNotification = async (orderDate: any) => {
+    await Notifications.scheduleNotificationAsync({
+      content:{
+        title: "🍕 New Order Received!",
+        body: `Amount: Rs. ${orderDate.amount} | Click to view details`,
+        sound: 'default',
+      },
+      trigger: null,
+    });
+  };
   
   const fetchOrders = async () => {
     try {
@@ -41,16 +80,12 @@ export default function HomeScreen(){
 
       setOrders((prevOrders) => [newOrder, ...prevOrders]);
 
-      Alert.alert(
-        "New Order Received! 🍕",
-        `Amount: Rs. ${newOrder.amount}\nTable/Address: ${newOrder.address?.street || 'N/A'}}`
-      );
+      sendNotification(newOrder);
     });
 
     return () => {
       socket.disconnect();
     };
- 
   }, []);
 
   const onRefresh = useCallback(() => {
@@ -70,8 +105,8 @@ export default function HomeScreen(){
       <Text style={styles.amount}>Rs. {item.amount}.00</Text>
 
       <Text style={styles.details}>
-        📅 {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'} | 
-        🕒 {item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
+        📅 {item.data ? new Date(item.data).toLocaleDateString() : 'N/A'} | 
+        🕒 {item.data ? new Date(item.data).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
       </Text>
 
       <Text style={styles.address}>📍 {item.address?.firstName} - {item.address?.street}</Text>
@@ -133,13 +168,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3, // Android shadow
+    elevation: 3, 
   },
-  // orderTitle:{
-  //   fontWeight: 'bold',
-  //   marginBottom: 5,
-  //   fontSize: 18,
-  // },
   listContainer:{
     paddingBottom: 20,
   },
@@ -163,7 +193,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   amount:{
-fontSize: 22,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#1890ff',
     marginBottom: 5,

@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.env
+
+
+"random#secret"
+"sk_test_51SnYbmKD1ouub5qIVFtBjfu0Kb0heUjahjdevnySusHsDMIAIfYAXeXh2HOpHxplroePIdQ5UTcFqmYPpEqy60Wk00vPEV0lCp"
+mongodb+srv://nimharachalana_food_del:Chalana2002@cluster0.wijqlot.mongodb.net/Food-Del

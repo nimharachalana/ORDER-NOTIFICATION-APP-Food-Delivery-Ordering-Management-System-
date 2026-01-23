@@ -7,7 +7,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 // placing user order for frontend
 const placeOrder = async (req,res) => {
 
-    const frontend_url = "http://localhost:5174"
+    const frontend_url = "http://localhost:5173"
     
     try {
         const newOrder = new orderModel({
@@ -63,7 +63,6 @@ const verifyOrder = async (req,res) => {
     try {
         if (success=="true") {
             const updatedOrder = await orderModel.findByIdAndUpdate(orderId,{payment:true}, {new: true});
-            res.json({success:true,message:"Paid"})
 
             if (req.io) {
                 req.io.emit('new-order-notification', updatedOrder);
